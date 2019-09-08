@@ -1,10 +1,9 @@
-import React, { useReducer, useEffect, useCallback } from 'react';
-
+import React, { useReducer, useEffect, useCallback, useMemo } from 'react';
+import useHttp from '../../hooks/http';
 import IngredientForm from './IngredientForm';
 import IngredientList from './IngredientList';
 import ErrorModal from '../UI/ErrorModal';
 import Search from './Search';
-import axios from 'axios';
 
 // better state management
 const ingredientReducer = (currentState, action) => {
@@ -23,69 +22,49 @@ const ingredientReducer = (currentState, action) => {
     }
 }
 
-const httpReducer = (currentState, action) => {
-    switch(action.type){
-        case 'Send':
-          return {loading: true, error: null};
-        case 'Response':
-           return {...currentState, loading: false};
-        case 'Error':
-          return {error: action.error};
-        case 'Finally':
-          return {...currentState, loading: false};
-        case 'Clear':
-          return {...currentState, error: null};
-        default:
-          throw new Error('Not viable action type');
-    }
-}
-
 function Ingredients() {
 
   const [ingredients, dispatch] = useReducer(ingredientReducer, []);
-  const [httpState, httpDispatch] = useReducer(httpReducer, {loading: false, error: null});
+  const { isLoading, error, data, sendRequest, reqExtra, identifier, clearError} = useHttp();
 
   useEffect(() => {
-    console.log(ingredients)
-  }, [ingredients])
+      if(reqExtra && !isLoading && identifier === 'Delete_Ingredient')
+        dispatch({type: 'Delete', fireRef: reqExtra});
+      else if(reqExtra && !isLoading && identifier === 'Add_Ingredient')
+        dispatch({type: 'Add', ingredient: {fireRef: data.name , ...reqExtra}})
+      
+  }, [data, reqExtra, identifier, isLoading])
 
+  const addIngrendientsHandler = useCallback(ingredient => {
+      sendRequest('ingredients.json', 'post', ingredient, ingredient, 'Add_Ingredient');
+  }, [sendRequest]);
 
-  const addIngrendientsHandler = ingredient => {
-      httpDispatch({type: 'Send'});
-      axios.post('ingredients.json', ingredient)
-        .then(r => r.data)
-        .then(data =>  dispatch({type: 'Add', ingredient: {fireRef: data.name , ...ingredient}}))
-        .catch(e => httpDispatch({type: 'Error',action: e.message}))
-        .finally(() => httpDispatch({type: 'Finally'}));
-  };
+  const deleteIngrendientHandler = useCallback(fireRef => {
+      sendRequest(`ingredients/${fireRef}.json`, 'delete', null, fireRef, 'Delete_Ingredient')
+  }, [sendRequest]);
 
-  const deleteIngrendientHandler = fireRef => {
-    httpDispatch({type: 'Send'});
-    axios.delete(`ingredients/${fireRef}.json`)
-        .then(a => {
-            httpDispatch({type: 'Response'});
-            dispatch({type: 'Delete'}, {fireRef: fireRef}) 
-          })
-        .catch(e => httpDispatch({type: 'Error', error: e.message}))
-        .finally(() => httpDispatch({type: 'Finally'}));
-  }
   const filterHandler = useCallback(filteredIngredients => {
       dispatch({type: 'Set', ingredients: filteredIngredients});
   }, []);
 
-  const errorState = httpState.error != null ? <ErrorModal onClose ={() => httpDispatch({type:'Clear'})}>{httpState.error}</ErrorModal> : null;
+  const errorState = error != null ? <ErrorModal onClose ={clearError}>{error}</ErrorModal> : null;
+
+  const ingredientList = useMemo(() => {
+     return <IngredientList ingredients={ingredients} onRemoveItem={deleteIngrendientHandler}/>
+    }, [ingredients, deleteIngrendientHandler]);
 
   return (
     <div className="App">
       {errorState}
-      <IngredientForm addIngredient={addIngrendientsHandler} loading={httpState.loading}/>
+      <IngredientForm addIngredient={addIngrendientsHandler} loading={isLoading}/>
 
       <section>
         <Search onLoadIngredients={filterHandler}/>
-        <IngredientList ingredients={ingredients} onRemoveItem={deleteIngrendientHandler}/>
+        {ingredientList}
       </section>
     </div>
   );
 }
 
 export default Ingredients;
+ 
