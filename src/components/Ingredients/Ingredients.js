@@ -28,10 +28,14 @@ function Ingredients() {
   const { isLoading, error, data, sendRequest, reqExtra, identifier, clearError} = useHttp();
 
   useEffect(() => {
-      if(reqExtra && !isLoading && identifier === 'Delete_Ingredient')
-        dispatch({type: 'Delete', fireRef: reqExtra});
-      else if(reqExtra && !isLoading && identifier === 'Add_Ingredient')
-        dispatch({type: 'Add', ingredient: {fireRef: data.name , ...reqExtra}})
+      if(reqExtra && !isLoading){
+          if(identifier === 'Delete_Ingredient'){
+            dispatch({type: 'Delete', fireRef: reqExtra});
+          }
+          else if(identifier === 'Add_Ingredient'){
+            dispatch({type: 'Add', ingredient: {fireRef: data.name , ...reqExtra}});
+          }
+      }
       
   }, [data, reqExtra, identifier, isLoading])
 
